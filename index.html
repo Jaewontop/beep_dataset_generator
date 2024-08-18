@@ -4,19 +4,150 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Study Timer</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css"> <!-- 외부 스타일 파일 추가 -->
 </head>
 <body>
-    <div id="container">
-        <h2>YouTube Study Timer</h2>
-        <input type="text" id="youtube-url" placeholder="유튜브 스트리밍 URL을 입력하세요">
-        <br>
-        <button id="load-button">불러오기</button>
-        <button id="save-button">저장하기</button>
-        <div id="player-container"></div>
+    <h2>YouTube Study Timer</h2>
+    <div class="input-container">
+        <input type="text" id="youtube-url" placeholder="YouTube URL을 입력하세요">
+        <div class="button-container">
+            <button id="load-button">불러오기</button>
+            <button id="start-distraction">딴짓 시작</button>
+            <button id="end-distraction">딴짓 끝</button>
+            <button id="save-button">저장</button>
+        </div>
     </div>
 
+    <div class="homzzang">
+        <iframe id="youtube-player" src="" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+
+    <form action="..." method="...">
+        <input id="ytb_cur" name="ytb_cur" placeholder="시작 시간">
+        <input id="ytb_tot" name="ytb_tot" placeholder="총 시간">
+    </form>
+
+    <!-- 딴짓 구간 표시 -->
+    <h3>딴짓 구간:</h3>
+    <ul id="distraction-list"></ul>
+
+    <!-- JavaScript 코드 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
-    <script src="script.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let ytb;
+        let distractionStart = null;
+        let distractionEnd = null;
+        let timestamps = [];
+        const distractionList = document.getElementById('distraction-list');
+
+        function onYouTubeIframeAPIReady() {
+            document.getElementById('load-button').addEventListener('click', () => {
+                const url = document.getElementById('youtube-url').value;
+                const videoId = getYouTubeVideoId(url);
+
+                if (videoId) {
+                    loadYouTubePlayer(videoId);
+                } else {
+                    alert('유효한 YouTube URL을 입력하세요.');
+                }
+            });
+
+            document.getElementById('start-distraction').addEventListener('click', () => {
+                distractionStart = Math.floor(ytb.getCurrentTime());
+                addDistractionToList(distractionStart); // 시작 시간을 리스트에 바로 추가
+            });
+
+            document.getElementById('end-distraction').addEventListener('click', () => {
+                distractionEnd = Math.floor(ytb.getCurrentTime());
+                updateDistractionInList(distractionEnd); // 끝 시간을 리스트에 업데이트
+                markDistractionPeriod(distractionStart, distractionEnd);
+            });
+
+            document.getElementById('save-button').addEventListener('click', () => {
+                saveToExcel(timestamps);
+            });
+        }
+
+        function getYouTubeVideoId(url) {
+            const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        function loadYouTubePlayer(videoId) {
+            const iframe = document.getElementById('youtube-player');
+            iframe.src = `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+
+            ytb = new YT.Player(iframe, {
+                events: {
+                    onReady: (event) => {
+                        event.target.playVideo();
+                        setTimeout(() => {
+                            const totalDuration = Math.floor(ytb.getDuration());
+                            document.getElementById('ytb_tot').value = formatTime(totalDuration);
+                            generateTimestamps(totalDuration); // 전체 길이를 기준으로 타임스탬프 생성
+                        }, 1000);
+                    }
+                }
+            });
+
+            setInterval(() => {
+                if (ytb && ytb.getCurrentTime && ytb.getDuration) {
+                    document.getElementById('ytb_cur').value = formatTime(Math.floor(ytb.getCurrentTime())); // 현재 시간
+                    document.getElementById('ytb_tot').value = formatTime(Math.floor(ytb.getDuration())); // 전체 시간
+                }
+            }, 1000);
+        }
+
+        function generateTimestamps(totalDuration) {
+            timestamps = [];
+            for (let i = 0; i <= totalDuration; i += 2) { // 00:00부터 ytb_tot까지 2초 간격
+                const minutes = String(Math.floor(i / 60)).padStart(2, '0');
+                const seconds = String(i % 60).padStart(2, '0');
+                const time = `${minutes}:${seconds}`;
+                timestamps.push([time, '공부']);
+            }
+        }
+
+        function markDistractionPeriod(start, end) {
+            const startIndex = Math.floor(start / 2);
+            const endIndex = Math.floor(end / 2);
+
+            for (let i = startIndex; i <= endIndex; i++) {
+                if (timestamps[i]) {
+                    timestamps[i][1] = '딴짓';
+                }
+            }
+        }
+
+        function addDistractionToList(start) {
+            const listItem = document.createElement('li');
+            listItem.id = 'distraction-item'; // ID 설정
+            listItem.textContent = `${formatTime(start)} ~ 진행 중`;
+            distractionList.appendChild(listItem);
+        }
+
+        function updateDistractionInList(end) {
+            const listItem = document.getElementById('distraction-item');
+            if (listItem) {
+                listItem.textContent = listItem.textContent.replace('진행 중', formatTime(end));
+                listItem.removeAttribute('id'); // ID 제거
+            }
+        }
+
+        function formatTime(seconds) {
+            const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
+            const remainingSeconds = String(seconds % 60).padStart(2, '0');
+            return `${minutes}:${remainingSeconds}`;
+        }
+
+        function saveToExcel(data) {
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Study Timer");
+            XLSX.writeFile(workbook, 'study_timer.xlsx');
+        }
+    </script>
 </body>
 </html>
