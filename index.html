@@ -36,7 +36,6 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         let ytb;
-        let timestamps = [];
         let students = [];
 
         function onYouTubeIframeAPIReady() {
@@ -76,7 +75,6 @@
                         setTimeout(() => {
                             const totalDuration = Math.floor(ytb.getDuration());
                             document.getElementById('ytb_tot').value = formatTime(totalDuration);
-                            generateTimestamps(totalDuration);
                         }, 1000);
                     }
                 }
@@ -92,14 +90,6 @@
             }
         }
 
-        function generateTimestamps(totalDuration) {
-            timestamps = [];
-            for (let i = 0; i <= totalDuration; i += 2) {
-                const time = formatTime(i);
-                timestamps.push([time, '공부']);
-            }
-        }
-
         function formatTime(seconds) {
             const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
             const remainingSeconds = String(seconds % 60).padStart(2, '0');
@@ -109,7 +99,7 @@
         function addStudent() {
             const name = document.getElementById('student-name').value.trim();
             if (name) {
-                const student = { name, distractions: [] };
+                const student = { name, studyStart: null, studyEnd: null, distractions: [] };
                 students.push(student);
                 renderStudentList();
                 document.getElementById('student-name').value = '';
@@ -125,6 +115,10 @@
                 studentContainer.innerHTML = `
                     <h3>${student.name}</h3>
                     <div class="button-container">
+                        <button onclick="startStudy(${index})">공부 시작</button>
+                        <button onclick="endStudy(${index})">공부 끝</button>
+                    </div>
+                    <div class="button-container">
                         <button onclick="startDistraction(${index})">딴짓 시작</button>
                         <button onclick="endDistraction(${index})">딴짓 끝</button>
                     </div>
@@ -133,6 +127,26 @@
                 studentList.appendChild(studentContainer);
                 renderDistractions(index);
             });
+        }
+
+        function startStudy(studentIndex) {
+            if (!ytb || !ytb.getCurrentTime) {
+                alert('먼저 YouTube 영상을 불러와주세요.');
+                return;
+            }
+            const currentTime = Math.floor(ytb.getCurrentTime());
+            students[studentIndex].studyStart = currentTime;
+            alert(`${students[studentIndex].name}의 공부 시작 시간이 기록되었습니다: ${formatTime(currentTime)}`);
+        }
+
+        function endStudy(studentIndex) {
+            if (!ytb || !ytb.getCurrentTime) {
+                alert('먼저 YouTube 영상을 불러와주세요.');
+                return;
+            }
+            const currentTime = Math.floor(ytb.getCurrentTime());
+            students[studentIndex].studyEnd = currentTime;
+            alert(`${students[studentIndex].name}의 공부 종료 시간이 기록되었습니다: ${formatTime(currentTime)}`);
         }
 
         function startDistraction(studentIndex) {
@@ -154,7 +168,6 @@
             const lastDistraction = students[studentIndex].distractions[students[studentIndex].distractions.length - 1];
             if (lastDistraction && lastDistraction.end === null) {
                 lastDistraction.end = currentTime;
-                markDistractionPeriod(studentIndex, lastDistraction.start, lastDistraction.end);
             }
             renderDistractions(studentIndex);
         }
@@ -169,17 +182,6 @@
             });
         }
 
-        function markDistractionPeriod(studentIndex, start, end) {
-            const startIndex = Math.floor(start / 2);
-            const endIndex = Math.floor(end / 2);
-
-            for (let i = startIndex; i <= endIndex && i < timestamps.length; i++) {
-                if (!timestamps[i][studentIndex + 2]) {
-                    timestamps[i][studentIndex + 2] = '딴짓';
-                }
-            }
-        }
-
         async function saveStudyLog() {
             const studyStartTimeInput = document.getElementById('study-start-time').value;
             const studyStartTime = new Date(studyStartTimeInput);
@@ -192,18 +194,20 @@
             const videoUrl = document.getElementById('youtube-url').value; // YouTube URL 가져오기
 
             const logData = {
-                study_start_dttm: studyStartTimeKST.toISOString(),
-                study_end_dttm: studyEndTimeKST.toISOString(),
-                video_url: videoUrl, // video_url 추가
+                video_start_dttm: studyStartTimeKST.toISOString(),
+                video_end_dttm: studyEndTimeKST.toISOString(),
+                video_url: videoUrl,
                 students: students.map(student => ({
                     nickname: student.name,
+                    study_start_time: student.studyStart ? formatTime(student.studyStart) : null,
+                    study_end_time: student.studyEnd ? formatTime(student.studyEnd) : null,
                     distractions: student.distractions.map(distraction => ({
                         start: formatTime(distraction.start),
                         end: distraction.end ? formatTime(distraction.end) : null
                     }))
                 }))
             };
-            console.log(logData);
+
             try {
                 const response = await fetch('https://beep-backend-three.vercel.app/api/save-study-log', {
                     method: 'POST',
