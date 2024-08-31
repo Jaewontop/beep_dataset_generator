@@ -1,23 +1,32 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Study Timer</title>
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <h2>YouTube Study Timer</h2>
     <div class="input-container">
         <input type="text" id="youtube-url" placeholder="YouTube URL을 입력하세요">
         <div class="button-container">
             <button id="load-button">불러오기</button>
-            <button id="save-button">저장</button>
+
         </div>
+        <div class="button-container">
+            <button id="save-button">저장</button>
+            <div id="loading-indicator"></div> <!-- Circle Indicator -->
+        </div>
+
+
     </div>
 
     <div class="homzzang">
-        <iframe id="youtube-player" src="" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <iframe id="youtube-player" src="" frameborder="0"
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
     </div>
 
     <form>
@@ -183,6 +192,9 @@
         }
 
         async function saveStudyLog() {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            loadingIndicator.style.display = 'inline-block'; // Indicator 보이기
+
             const studyStartTimeInput = document.getElementById('study-start-time').value;
             const studyStartTime = new Date(studyStartTimeInput);
             const videoDurationInSeconds = ytb.getDuration();
@@ -225,8 +237,12 @@
                 }
             } catch (error) {
                 alert(`네트워크 오류가 발생했습니다: ${error.message}`);
+            } finally {
+                loadingIndicator.style.display = 'none'; // Indicator 숨기기
             }
         }
+
     </script>
 </body>
+
 </html>
