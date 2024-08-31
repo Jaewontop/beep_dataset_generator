@@ -191,12 +191,12 @@
             const studyStartTimeKST = new Date(studyStartTime.getTime() - studyStartTime.getTimezoneOffset() * 60000);
             const studyEndTimeKST = new Date(studyEndTime.getTime() - studyEndTime.getTimezoneOffset() * 60000);
 
-            const videoUrl = document.getElementById('youtube-url').value; // YouTube URL 가져오기
+            const url = document.getElementById('youtube-url').value; // YouTube URL 가져오기
 
             const logData = {
                 video_start_dttm: studyStartTimeKST.toISOString(),
                 video_end_dttm: studyEndTimeKST.toISOString(),
-                video_url: videoUrl,
+                url: url,
                 students: students.map(student => ({
                     nickname: student.name,
                     study_start_time: student.studyStart ? formatTime(student.studyStart) : null,
